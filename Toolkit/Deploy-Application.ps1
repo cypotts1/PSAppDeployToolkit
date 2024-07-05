@@ -106,15 +106,15 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = ''
-    [String]$appName = ''
-    [String]$appVersion = ''
+    [String]$appVendor = 'AlertMedia'
+    [String]$appName = 'Desktop Notifications'
+    [String]$appVersion = '5.0.9'
     [String]$appArch = ''
     [String]$appLang = 'EN'
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
-    [String]$appScriptDate = 'XX/XX/20XX'
-    [String]$appScriptAuthor = '<author name>'
+    [String]$appScriptDate = '07/05/2024'
+    [String]$appScriptAuthor = 'Cy Potts'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
     [String]$installName = ''
@@ -187,7 +187,8 @@ Try {
         Show-InstallationProgress
 
         ## <Perform Pre-Installation tasks here>
-
+        #Install app
+        Execute-MSI -Action 'Install' -Path "$dirFiles\AlertMedia-5.0.9.msi" -Parameters '/qn /norestart'
 
         ##*===============================================
         ##* INSTALLATION
@@ -205,7 +206,10 @@ Try {
         }
 
         ## <Perform Installation tasks here>
-
+        #Create folder if it does not exist
+		New-Folder -Path "$envProgramData\AlertMedia"
+		#Copy config file to C:\ProgramData\AlertMedia
+		Copy-File -Path "$dirSupportFiles\config.json" -Destination "$envProgramData\AlertMedia\config.json"
 
         ##*===============================================
         ##* POST-INSTALLATION
@@ -213,6 +217,8 @@ Try {
         [String]$installPhase = 'Post-Installation'
 
         ## <Perform Post-Installation tasks here>
+        #Start app so users will know to login
+		Execute-ProcessAsUser -Path "$envProgramFiles\AlertMedia Desktop Notifications\AlertMedia.exe"
 
         ## Display a message at the end of the install
         If (-not $useDefaultMsi) {
@@ -226,13 +232,14 @@ Try {
         [String]$installPhase = 'Pre-Uninstallation'
 
         ## Show Welcome Message, close Internet Explorer with a 60 second countdown before automatically closing
-        Show-InstallationWelcome -CloseApps 'iexplore' -CloseAppsCountdown 60
+        Show-InstallationWelcome -CloseApps 'AlertMedia' -Silent
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
 
         ## <Perform Pre-Uninstallation tasks here>
-
+        #Remove created folder
+        Remove-Folder -Path "$envProgramData\AlertMedia"
 
         ##*===============================================
         ##* UNINSTALLATION
@@ -248,7 +255,8 @@ Try {
         }
 
         ## <Perform Uninstallation tasks here>
-
+        #Remove app
+        Remove-MSIApplications -Name 'AlertMedia'
 
         ##*===============================================
         ##* POST-UNINSTALLATION
