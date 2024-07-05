@@ -106,20 +106,25 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = ''
-    [String]$appName = ''
-    [String]$appVersion = ''
-    [String]$appArch = ''
+    [String]$appVendor = 'TeamViewer'
+    [String]$appName = 'Host'
+    [String]$appVersion = '15.55.3'
+    [String]$appArch = 'x86'
     [String]$appLang = 'EN'
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
-    [String]$appScriptDate = 'XX/XX/20XX'
-    [String]$appScriptAuthor = '<author name>'
+    [String]$appScriptDate = '07/05/2024'
+    [String]$appScriptAuthor = 'Cy Potts'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
     [String]$installName = ''
     [String]$installTitle = ''
 
+    ## Variables: Custom
+    #Tells installer which custom configuration to use
+    [String]$configid = '62icc3f'
+    #Tells client which group it should be assigned to
+    [String]$assignmentid = '0001CoABChDOxfnQeUgR7L3NvU-kvRCSEigIACAAAgAJAH8gR6JlLmjJSieIDe360VqLGfSdia-qF3DWYgNqOHbqGkCV6FzaelqjY9N5BO0qIjhF12ySF_V9T0dxgZPoAIcjwsa6GwtHfxsHFLaNJ6WJFlu9SD1P47YQwkuWvO6eEef-IAEQ2OOz6wU='
     ##* Do not modify section below
     #region DoNotModify
 
@@ -187,7 +192,8 @@ Try {
         Show-InstallationProgress
 
         ## <Perform Pre-Installation tasks here>
-
+        #Remove old versions (reinstalls virtual security driver) or full clients
+        Remove-MSIApplications -Name 'TeamViewer'
 
         ##*===============================================
         ##* INSTALLATION
@@ -205,6 +211,10 @@ Try {
         }
 
         ## <Perform Installation tasks here>
+        #Install app with virtual security key driver, delete shortcuts, no outlook plugin
+        Execute-MSI -Action 'Install' -Path "$dirFiles\TeamViewer_Host.msi" -Parameters "/qn INSTALLSECURITYKEYREDIRECTION=1 DESKTOPSHORTCUTS=0 CUSTOMCONFIGID=$configid ENABLEOUTLOOKPLUGIN=false /norestart"
+        #Wait for client to finish initializing
+        Start-Sleep -Seconds 30
 
 
         ##*===============================================
@@ -213,6 +223,8 @@ Try {
         [String]$installPhase = 'Post-Installation'
 
         ## <Perform Post-Installation tasks here>
+        #Start teamviewer and assign it to a group
+        Execute-Process -Path "$envProgramFilesX86\TeamViewer\TeamViewer.exe" -Parameters "assignment --id $assignmentid"
 
         ## Display a message at the end of the install
         If (-not $useDefaultMsi) {
@@ -248,7 +260,8 @@ Try {
         }
 
         ## <Perform Uninstallation tasks here>
-
+        #Remove application (host only)
+        Remove-MSIApplications -Name 'TeamViewer Host'
 
         ##*===============================================
         ##* POST-UNINSTALLATION
