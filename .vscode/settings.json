@@ -1,5 +1,25 @@
 // PSAppDeployToolkit default settings to ensure consistent code formatting and file encoding
 {
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/CVS": true,
+        "**/.DS_Store":true,
+        "**/Thumbs.db":true,
+        "docs":true,
+        "Examples":true,
+        "material":true,
+        "Sources":true,
+        "Testing":true,
+        "CHANGELOG.txt":true,
+        "COPYING.Lesser":true,
+        "LICENSE":true,
+        "AppDeployToolkitLogo.png":true,
+        "mkdocs.yml":true,
+        "README.md":true,
+        "**/Deploy-Application.exe*":true
+    },
     //-------- Indentation configuration --------
     "editor.detectIndentation": true,
     "editor.formatOnPaste": true,
