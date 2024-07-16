@@ -92,7 +92,9 @@ Param (
     [Parameter(Mandatory = $false)]
     [switch]$TerminalServerMode = $false,
     [Parameter(Mandatory = $false)]
-    [switch]$DisableLogging = $false
+    [switch]$DisableLogging = $false,
+    [ValidateSet('All', 'Base', 'NAM', 'WSM', 'ISE', 'Posture', 'GINA')]
+    [string[]]$DeployModules = "Base,GINA"
 )
 
 Try {
@@ -106,15 +108,15 @@ Try {
     ##* VARIABLE DECLARATION
     ##*===============================================
     ## Variables: Application
-    [String]$appVendor = ''
-    [String]$appName = ''
-    [String]$appVersion = ''
+    [String]$appVendor = 'Cisco'
+    [String]$appName = 'AnyConnect Secure Mobility Client'
+    [String]$appVersion = '4.10.08029'
     [String]$appArch = ''
     [String]$appLang = 'EN'
     [String]$appRevision = '01'
     [String]$appScriptVersion = '1.0.0'
-    [String]$appScriptDate = 'XX/XX/20XX'
-    [String]$appScriptAuthor = '<author name>'
+    [String]$appScriptDate = '07/11/2024'
+    [String]$appScriptAuthor = 'Cy Potts'
     ##*===============================================
     ## Variables: Install Titles (Only set here to override defaults set by the toolkit)
     [String]$installName = ''
@@ -181,13 +183,22 @@ Try {
         [String]$installPhase = 'Pre-Installation'
 
         ## Show Welcome Message, close Internet Explorer if required, allow up to 3 deferrals, verify there is enough disk space to complete the install, and persist the prompt
-        Show-InstallationWelcome -CloseApps 'iexplore' -AllowDefer -DeferTimes 3 -CheckDiskSpace -PersistPrompt
+        #Allow deferral
+        Show-InstallationWelcome -AllowDefer -DeferTimes 3
+        #Check if vpn cli exists
+        if (Test-Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpncli.exe") {
+            #Disconnect any VPN sessions
+            Execute-Process -Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpncli.exe" -Parameters 'disconnect' -WindowStyle 'Hidden'
+            #Stop vpnagent service, this will close VPN GUI also
+            Stop-ServiceAndDependencies -Name 'vpnagent'
+        }
+
+        #Show-InstallationWelcome -CloseApps 'vpnui,vpnagent' -Silent
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
 
         ## <Perform Pre-Installation tasks here>
-
 
         ##*===============================================
         ##* INSTALLATION
@@ -205,7 +216,53 @@ Try {
         }
 
         ## <Perform Installation tasks here>
+        #Switch to choose which modules to install, default is Base, and GINA
+        Switch -regex ($DeployModules) {
 
+            'Base|All' {
+                If (Test-Path "$envProgramData\Cisco\Cisco AnyConnect Secure Mobility Client\Profile\VPNDisable_ServiceProfile.xml") {
+                    Remove-Item "$envProgramData\Cisco\Cisco AnyConnect Secure Mobility Client\Profile\VPNDisable_ServiceProfile.xml"
+                }
+
+                #Install Client
+                Show-InstallationProgress -StatusMessage 'Installing AnyConnect Client'
+                Execute-MSI -Action Install -Path "$dirfiles\anyconnect-win-$appVersion-core-vpn-predeploy-k9.msi" -Parameters 'PRE_DEPLOY_DISABLE_VPN=1 /norestart /passive /QN'
+
+                If (! (Test-Path "$envProgramData\Cisco\Cisco AnyConnect Secure Mobility Client\Profile\VPN2Profile.xml")) {
+                    Copy-File -Path "$dirFiles\Profiles\vpn\VPN2Profile.xml" -Destination "$envProgramData\Cisco\Cisco AnyConnect Secure Mobility Client\Profile\VPN2Profile.xml"
+                }
+
+                #Diagnostic And Reporting Tool
+                Show-InstallationProgress -StatusMessage 'Installing Diagnostic and Reporting Tool'
+                Execute-MSI -Action Install -Path "$dirFiles\anyconnect-win-$appVersion-dart-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+            }
+
+            #Start Before Login component
+            'GINA|All' {
+                Show-InstallationProgress -StatusMessage 'Installing Start before Logon Module'
+                Execute-MSI -Action Install -Path "$dirFiles\anyconnect-win-$appVersion-gina-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+            }
+
+            #Network Access Module
+            'NAM|All' {
+                Show-InstallationProgress -StatusMessage 'Installing Network Access Module'
+                Execute-MSI -Action Install -Path "$dirFiles\anyconnect-win-$appVersion-nam-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+
+                Start-Sleep -s 10
+            }
+
+            #Posture module
+            'Posture|All' {
+                Show-InstallationProgress -StatusMessage 'Installing Posture Module'
+                Execute-MSI -Action Install -Path "$dirFiles\anyconnect-win-$appVersion-posture-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+            }
+
+            #ISE posture module
+            'ISE|All' {
+                Show-InstallationProgress -StatusMessage 'Installing ISE Posture Module'
+                Execute-MSI -Action Install -Path "$dirFiles\anyconnect-win-$appVersion-iseposture-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+            }
+        }
 
         ##*===============================================
         ##* POST-INSTALLATION
@@ -216,7 +273,7 @@ Try {
 
         ## Display a message at the end of the install
         If (-not $useDefaultMsi) {
-            Show-InstallationPrompt -Message 'You can customize text to appear at the end of an install or remove it completely for unattended installations.' -ButtonRightText 'OK' -Icon Information -NoWait
+            Show-InstallationPrompt -Message 'Cisco AnyConnect VPN client update complete. Please reboot your computer.' -ButtonRightText 'OK' -Icon Information -NoWait
         }
     }
     ElseIf ($deploymentType -ieq 'Uninstall') {
@@ -226,13 +283,17 @@ Try {
         [String]$installPhase = 'Pre-Uninstallation'
 
         ## Show Welcome Message, close Internet Explorer with a 60 second countdown before automatically closing
-        Show-InstallationWelcome -CloseApps 'iexplore' -CloseAppsCountdown 60
+        #Allow deferral
+        Show-InstallationWelcome -AllowDefer -DeferTimes 3
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
 
         ## <Perform Pre-Uninstallation tasks here>
-
+        #Disconnect any VPN sessions
+        Execute-Process -Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpncli.exe" -Parameters 'disconnect' -WindowStyle 'Hidden'
+        #Stop vpnagent service, this will close VPN GUI also
+        Stop-ServiceAndDependencies -Name 'vpnagent'
 
         ##*===============================================
         ##* UNINSTALLATION
@@ -248,7 +309,33 @@ Try {
         }
 
         ## <Perform Uninstallation tasks here>
+        #Uninstallation must happen in a specific order: Extra modules > Base client > DART
+        #Uninstall Start Before Login compponent
+        Execute-MSI -Action Uninstall -Path "$dirFiles\anyconnect-win-$appVersion-gina-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
 
+        #Uninstall Network Access Module
+        Show-InstallationProgress -StatusMessage 'Uninstalling Network Access Module'
+        Execute-MSI -Action Uninstall -Path "$dirFiles\anyconnect-win-$appVersion-nam-predeploy-k9.msi"-Parameters '/norestart /passive /QN'
+        Remove-File -Path "$envProgramData\Cisco\Cisco AnyConnect Secure Mobility Client\Network Access Manager\*" -Recurse
+
+        #Uninstall posture module
+        Show-InstallationProgress -StatusMessage 'Uninstalling Posture Module'
+        Execute-MSI -Action Uninstall -Path "$dirFiles\anyconnect-win-$appVersion-posture-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+
+        #ISE posture module
+        Show-InstallationProgress -StatusMessage 'Uninstalling ISE Posture Module'
+        Execute-MSI -Action Uninstall -Path "$dirFiles\anyconnect-win-$appVersion-iseposture-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+
+        #Uninstall Client
+        Show-InstallationProgress -StatusMessage 'Uninstalling Client'
+        Execute-MSI -Action Uninstall -Path "$dirFiles\anyconnect-win-$appVersion-core-vpn-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
+
+        #Remove Profile
+        Remove-File -Path "$envProgramData\Cisco\Cisco AnyConnect Secure Mobility Client\Profile\*" -Recurse
+
+        #Uninstall Diagnostic And Reporting Tool
+        Show-InstallationProgress -StatusMessage 'Uninstalling Diagnostic and Reporting Tool'
+        Execute-MSI -Action Uninstall -Path "$dirFiles\anyconnect-win-$appVersion-dart-predeploy-k9.msi" -Parameters '/norestart /passive /QN'
 
         ##*===============================================
         ##* POST-UNINSTALLATION
