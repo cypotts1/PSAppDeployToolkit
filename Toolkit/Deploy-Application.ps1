@@ -184,14 +184,14 @@ Try {
 
         ## Show Welcome Message, close Internet Explorer if required, allow up to 3 deferrals, verify there is enough disk space to complete the install, and persist the prompt
         #Allow deferral
-        Show-InstallationWelcome -AllowDefer -DeferTimes 3
+        Show-InstallationWelcome -CloseApps 'vpnagent' -AllowDefer -DeferTimes 3 -ForceCloseAppsCountdown 1800
         #Check if vpn cli exists
-        if (Test-Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpncli.exe") {
+        <#if (Test-Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpncli.exe") {
             #Disconnect any VPN sessions
             Execute-Process -Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpncli.exe" -Parameters 'disconnect' -WindowStyle 'Hidden'
             #Stop vpnagent service, this will close VPN GUI also
             Stop-ServiceAndDependencies -Name 'vpnagent'
-        }
+        }#>
 
         #Show-InstallationWelcome -CloseApps 'vpnui,vpnagent' -Silent
 
@@ -270,6 +270,10 @@ Try {
         [String]$installPhase = 'Post-Installation'
 
         ## <Perform Post-Installation tasks here>
+        Stop-ServiceAndDependencies -Name 'vpnagent'
+        Start-ServiceAndDependencies -Name 'vpnagent'
+
+        Execute-ProcessAsUser -Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpnui.exe"
 
         ## Display a message at the end of the install
         If (-not $useDefaultMsi) {
@@ -284,16 +288,16 @@ Try {
 
         ## Show Welcome Message, close Internet Explorer with a 60 second countdown before automatically closing
         #Allow deferral
-        Show-InstallationWelcome -AllowDefer -DeferTimes 3
+        Show-InstallationWelcome -CloseApps 'vpnagent' -AllowDefer -DeferTimes 3 -ForceCloseAppsCountdown 1800
 
         ## Show Progress Message (with the default message)
         Show-InstallationProgress
 
         ## <Perform Pre-Uninstallation tasks here>
-        #Disconnect any VPN sessions
+        <##Disconnect any VPN sessions
         Execute-Process -Path "$envProgramFilesX86\Cisco\Cisco AnyConnect Secure Mobility Client\vpncli.exe" -Parameters 'disconnect' -WindowStyle 'Hidden'
         #Stop vpnagent service, this will close VPN GUI also
-        Stop-ServiceAndDependencies -Name 'vpnagent'
+        Stop-ServiceAndDependencies -Name 'vpnagent'#>
 
         ##*===============================================
         ##* UNINSTALLATION
